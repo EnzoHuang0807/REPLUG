@@ -1,0 +1,10 @@
+*.tsv
+
+__pycache__/
+data/
+embeddings/
+results_mmlu/
+results_qa/
+
+finetune_embeddings/
+finetune_retriever/
