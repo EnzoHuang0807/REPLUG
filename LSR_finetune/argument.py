@@ -22,7 +22,7 @@ def add_training_args(parser):
                         help="Input context length per iteration")
     parser.add_argument('--max_seq_len', type=int, default=256,
                         help="Maximum context + prediction length")
-    parser.add_argument('--batch_size', type=int, default=64,
+    parser.add_argument('--batch_size', type=int, default=3,
                         help="Batch size for LSR finetune")
     parser.add_argument('--verbose', action="store_true",
                         help="If enabled, output training logs")
