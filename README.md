@@ -48,7 +48,7 @@ Generate embeddings for the corpus
 EMB_DIR=/path/to/embeddings
 python generate_passage_embeddings.py \
     --model_name_or_path facebook/contriever \
-    --embed_dir $EMB_DIR  \
+    --emb_dir $EMB_DIR  \
     --passages psgs_w100.tsv \
 ```
 
@@ -89,7 +89,7 @@ EMB_DIR=/path/to/embeddings
 RES_DIR=/path/to/results
 
 python -u downstream_eval/mmlu.py \
---dataset_dir $MMLU_DATA \
+--data_dir $MMLU_DATA \
 --split test \
 --maxlen 2 \
 --do_retrieval \
@@ -119,7 +119,7 @@ python LSR_finetune/replug_lsr.py \
 --re_model_name_or_path facebook/contriever \
 --dataset wikitext-103-v1 \
 --model_name_or_path LSR_retriever \
---embed_dir LSR_embeddings \
+--emb_dir LSR_embeddings \
 --epoch 3 \
 --lr 2e-5 \
 --temperature_re 0.1 \

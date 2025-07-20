@@ -84,8 +84,8 @@ def generate_embeddings(args):
 
     allids, allembeddings = embed_passages(args, passages, model, tokenizer)
 
-    save_file = os.path.join(args.embed_dir, args.prefix + f'_{args.shard_id:02d}')
-    os.makedirs(args.embed_dir, exist_ok=True)
+    save_file = os.path.join(args.emb_dir, args.prefix + f'_{args.shard_id:02d}')
+    os.makedirs(args.emb_dir, exist_ok=True)
     print(f'Saving {len(allids)} passage embeddings to {save_file}.')
     with open(save_file, mode='wb') as f:
         pickle.dump((allids, allembeddings), f)
@@ -97,7 +97,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--passages', type=str, default=None, help='Path to passages (.tsv file)')
-    parser.add_argument('--embed_dir', type=str, default='wikipedia_embeddings', help='dir path to save embeddings')
+    parser.add_argument('--emb_dir', type=str, default='wikipedia_embeddings', help='dir path to save embeddings')
     parser.add_argument('--prefix', type=str, default='passages', help='prefix path to save embeddings')
     parser.add_argument('--shard_id', type=int, default=0, help="Id of the current shard")
     parser.add_argument('--num_shards', type=int, default=1, help="Total number of shards")

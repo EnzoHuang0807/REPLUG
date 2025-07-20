@@ -138,7 +138,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser = add_lm_args(parser)
     parser = add_retriever_args(parser)
-    parser.add_argument("--dataset_dir", "-d", type=str, default="data",
+    parser.add_argument("--data_dir", "-d", type=str, default="data",
                          help="Path to the dataset directory.")
     parser.add_argument("--truncate", type=int, default=10,
                          help="Truncate data to the specified size for each subject ; use -1 to disable truncation.")
@@ -164,7 +164,7 @@ def main():
     model.to(device)
 
     # load dataset
-    subjects = sorted([f.split("_test.csv")[0] for f in os.listdir(os.path.join(args.dataset_dir, "test")) if "_test.csv" in f])
+    subjects = sorted([f.split("_test.csv")[0] for f in os.listdir(os.path.join(args.data_dir, "test")) if "_test.csv" in f])
     all_cors = {}
     all_counter = 0 
     all_em = 0
@@ -180,9 +180,9 @@ def main():
         data process
         '''
         print(f"subject: {subject}")
-        train_df = pd.read_csv(os.path.join(args.dataset_dir, "dev", subject + "_dev.csv"), header=None)[:args.shots]
-        val_df = pd.read_csv(os.path.join(args.dataset_dir, "val", subject + "_val.csv"), header=None)
-        test_df = pd.read_csv(os.path.join(args.dataset_dir, "test", subject + "_test.csv"), header=None)
+        train_df = pd.read_csv(os.path.join(args.data_dir, "dev", subject + "_dev.csv"), header=None)[:args.shots]
+        val_df = pd.read_csv(os.path.join(args.data_dir, "val", subject + "_val.csv"), header=None)
+        test_df = pd.read_csv(os.path.join(args.data_dir, "test", subject + "_test.csv"), header=None)
 
         # build demos
         demos = data_from_csv_to_list(train_df) 

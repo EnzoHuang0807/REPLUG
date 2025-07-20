@@ -177,7 +177,7 @@ def main():
 
             args.re_model_name_or_path = args.model_name_or_path
             generate_embeddings(args)
-            args.passages_embeddings = f"{args.embed_dir}/*"
+            args.passages_embeddings = f"{args.emb_dir}/*"
             model.initialize_retriever()
 
 if __name__ == "__main__":

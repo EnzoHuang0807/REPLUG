@@ -32,7 +32,7 @@ def add_training_args(parser):
 def add_embeddings_args(parser):
     parser.add_argument('--per_gpu_batch_size', type=int, default=512, 
                         help="batch size for the passage encoder forward pass")
-    parser.add_argument('--embed_dir', type=str, default='LSR_embeddings', 
+    parser.add_argument('--emb_dir', type=str, default='LSR_embeddings', 
                         help='directory path to save embeddings')
     parser.add_argument('--prefix', type=str, default='passages', 
                         help='prefix path to save embeddings')
