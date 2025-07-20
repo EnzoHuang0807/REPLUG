@@ -1,4 +1,4 @@
-# REPLUG: 
+# REPLUG
 This includes a re-implementation of **REPLUG: Retrieval-Augmented Black-Box Language Models**
 
 ## Reasons for Re-Implementation
@@ -15,8 +15,8 @@ This includes a re-implementation of **REPLUG: Retrieval-Augmented Black-Box Lan
 
 ## LLM Scorer
 
-* Instead of using cosine similarity between query and document embeddings as score, one can LLM's ability to rerank model based on relevance. 
-* To enable this feature, use the `--llm_scorer` argument and set its value either to `pairwise` or `relevance`
+* Instead of scoring retrieved documents using cosine similarity, one can leverage an LLM to re-rank and score them based on relevance. 
+* To enable this feature, set the argument `--llm_scorer` to either `pairwise` or `relevance`
 
 ### Methods
 
