@@ -17,9 +17,6 @@ from collections import defaultdict
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from datasets import load_dataset
 
-from openai import OpenAI
-from itertools import combinations
-
 from retriever import Retriever
 from argument import add_lm_args, add_retriever_args
 from llm_scorer import pairwise_score, relevance_score
@@ -29,10 +26,6 @@ import random
 random.seed(0)
 torch.manual_seed(0)
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY").strip()
-if not OPENAI_API_KEY or not OPENAI_API_KEY.strip():
-    raise ValueError("Missing OPENAI_API_KEY. Please set it as an environment variable.")
-client = OpenAI(api_key=OPENAI_API_KEY)
 
 def call_api(args, prompt, temp):
 
@@ -55,10 +48,7 @@ def call_api(args, prompt, temp):
     full_sequence = gen_output.sequences[0]
     generated_ids = full_sequence[input_ids.shape[1]:]
     decoded_output = tokenizer.decode(generated_ids, skip_special_tokens=True)
-    
-    stop_seq="\n"
-    if stop_seq in decoded_output:
-        decoded_output = decoded_output.split(stop_seq)[0]
+    decoded_output = decoded_output.strip()
 
     # Extract log probability
     top_log_probs = []
@@ -71,14 +61,12 @@ def call_api(args, prompt, temp):
         token_id = generated_ids[i].item()
         log_prob = log_probs[i, token_id].item()
         token_str = tokenizer.decode([token_id])
-        if token_str == "\n":
-            continue
-        elif token_str == tokenizer.eos_token:
+        if token_str == tokenizer.eos_token:
             break
         top_log_probs.append(log_prob)
 
-    perplexity = np.exp(np.mean(top_log_probs))
-    return decoded_output, (top_log_probs, perplexity)
+    probability = np.exp(np.mean(top_log_probs))
+    return decoded_output, (top_log_probs, probability)
 
 
 def inference_one_ex(args, counter, prompt_batch, score_batch, eg):
@@ -139,8 +127,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser = add_lm_args(parser)
     parser = add_retriever_args(parser)
+    parser.add_argument("--truncate", type=int, default=500,
+                         help="Truncate data to the specified size ; use -1 to disable truncation.")
     parser.add_argument("--dataset", type=str, default="mandarjoshi/trivia_qa",
                          help="Name of the dataset to evaluate.")
+    parser.add_argument("--subset", type=str, default="rc",
+                         help="Subset of the dataset.")
     
     args = parser.parse_args()
 
@@ -170,14 +162,14 @@ def main():
     '''
     data process
     '''     
-    demos = load_dataset(args.dataset, "rc", split="train").select(range(args.shots))
+    demos = load_dataset(args.dataset, args.subset, split="train").select(range(args.shots))
     if args.split == "test":
-        test_set = load_dataset(args.dataset, "rc", split="test")
+        test_set = load_dataset(args.dataset, args.subset, split="test")
     elif args.split == "val":
-        test_set = load_dataset(args.dataset, "rc", split="validation")
+        test_set = load_dataset(args.dataset, args.subset, split="validation")
     
-    if args.truncate and len(test_set) > 500:
-            test_set = test_set.select(range(500))
+    if args.truncate != -1 and len(test_set) > args.truncate:
+            test_set = test_set.select(range(args.truncate))
     print("test_set: ", len(test_set))
     
 
@@ -187,15 +179,15 @@ def main():
 
     # build prompt
     prompt_demo = ""
-    if args.prompt_method in ["closed-book", "open-book"]:
-        for demo in demos:
-            # concat the top-1 doc
-            if args.prompt_method == "open-book":
-                docs, scores = retrieve_ex(demo, retriever)
-                prompt_demo += f"Knowledge: {docs[0]}\n"
-            prompt_demo += "Question: " + demo["question"] + "\n"
-            answer = demo["answer"]["aliases"][0]
-            prompt_demo += "Answer: " + answer.strip() + "\n\n"
+    for demo in demos:
+        # concat the top-1 doc
+        if args.do_retrieval:
+            assert(retriever != None)
+            docs, scores = retrieve_ex(demo, retriever)
+            prompt_demo += f"Knowledge: {docs[0]}\n"
+        prompt_demo += "Question: " + demo["question"] + "\n"
+        answer = demo["answer"]["aliases"][0]
+        prompt_demo += "Answer: " + answer.strip() + "\n\n"
 
     # run over test examples
     for eg in pbar:
@@ -210,7 +202,8 @@ def main():
         
         prompt_batch = []
         score_batch = []
-        if args.prompt_method == "open-book":
+        if args.do_retrieval:
+            assert(retriever != None)
             docs, scores = retrieve_ex(eg, retriever)
             # contatenation version
             for doc, score in zip(docs, scores):
@@ -221,7 +214,7 @@ def main():
                 prompt_batch.append(prompt_cur)
                 score_batch.append(score)
 
-        elif args.prompt_method == "closed-book":
+        else:
             prompt += "Question: " + eg["question"]  + "\n"
             prompt += "Answer:"
             prompt_batch.append(prompt)
@@ -249,8 +242,8 @@ def main():
             print(f"predictions saved to {out_json}")
             print()
 
-    # if retriever is not None:
-    #     retriever.dump_query2docs()
+    if retriever is not None:
+        retriever.dump_query2docs()
 
 
 if __name__ == '__main__':

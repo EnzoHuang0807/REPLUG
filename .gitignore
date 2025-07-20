@@ -6,5 +6,6 @@ embeddings/
 results_mmlu/
 results_qa/
 
-finetune_embeddings/
-finetune_retriever/
+LSR/
+LSR_embeddings/
+LSR_retriever/

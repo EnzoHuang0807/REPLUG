@@ -1,52 +1,76 @@
 import argparse
-
 parser = argparse.ArgumentParser()
 
-def add_lm_args(parser):
-    parser.add_argument('--apikey', type=str, required=False, help='api key; https://openai.com/api/')
-    parser.add_argument('--engine', type=str, default='davinci', help='api engine; https://openai.com/api/')
-    parser.add_argument('--split', type=str, default='val')
-    parser.add_argument('--task', type=str, choices=['mmlu', 'qa'], help='specify the task that you want to evaluate. Choices: [mmlu, qa]')
-    parser.add_argument("--data_dir", "-d", type=str, default="data")
 
+def add_training_args(parser):
+      
+    parser.add_argument('--epoch', type=int, default=3, 
+                        help="Number of training epochs")
+    parser.add_argument('--lr', type=int, default=2e-5, 
+                        help="Learning Rate")
+    parser.add_argument('--lm_model_name_or_path', type=str, default="meta-llama/Llama-3.2-3B",
+                        help="Path to directory containing LM model weights and config file")
+    parser.add_argument('--dataset', type=str, default="wikitext-103-v1",
+                        help="Dataset for LSR finetune")
+    parser.add_argument('--dataset_ratio', type=float, default=1.0,
+                        help="Ratio of dataset used for LSR finetune")
+    parser.add_argument('--temperature_lm', type=float, default=0.1,
+                        help="Temperature for LM likelihood")
+    parser.add_argument('--temperature_re', type=float, default=0.1,
+                        help="Temperature for retriever likelihood")
+    parser.add_argument('--context_len', type=int, default=128,
+                        help="Input context length per iteration")
+    parser.add_argument('--max_seq_len', type=int, default=256,
+                        help="Maximum context + prediction length")
+    parser.add_argument('--batch_size', type=int, default=64,
+                        help="Batch size for LSR finetune")
+    parser.add_argument('--verbose', action="store_true",
+                        help="If enabled, output training logs")
 
-    parser.add_argument('--prompt_method', type=str, default=None, help='specify the prompting method')
-    parser.add_argument('--print', default=False, action='store_true', help='Whether to print out every prompt')
-    parser.add_argument('--extract', default=False, action='store_true', help='Whether to add an additional answer extraction step')
-    parser.add_argument('--subset', default=False, action='store_true', help='Whether to use a small subset for debugging')
-    parser.add_argument('--subset_size', type=int, default=32, help='how many examples to sample for quick evaluation')
-    parser.add_argument('--maxlen', type=int, default=256, help='max number of tokens to be generated')
-    parser.add_argument('--shots', type=int, default=5, help='how many demos to use in the prompt')
-    parser.add_argument('--no_unanswerable', default=False, action='store_true', help='Whether to filter out unanswerable questions in the demo')
-    parser.add_argument('--label_shuffle', default=False, action='store_true', help='Whether to shuffle the gold labels')
-    parser.add_argument('--save_prob', default=False, action='store_true', help='Whether to save top token logprobs and perplexity')
-    parser.add_argument('--continue_from', type=int, default=0, help='evaluate on part of test set, starting from this index')
-    parser.add_argument('--per_gpu_batch_size', type=int, default=64)
+    return parser
+
+def add_embeddings_args(parser):
+    parser.add_argument('--per_gpu_batch_size', type=int, default=512, 
+                        help="batch size for the passage encoder forward pass")
+    parser.add_argument('--embed_dir', type=str, default='LSR_embeddings', 
+                        help='directory path to save embeddings')
+    parser.add_argument('--prefix', type=str, default='passages', 
+                        help='prefix path to save embeddings')
+    parser.add_argument('--shard_id', type=int, default=0, 
+                        help="Id of the current shard")
+    parser.add_argument('--num_shards', type=int, default=1, 
+                        help="total number of shards")
+    parser.add_argument('--passage_maxlength', type=int, default=512, 
+                        help="maximum number of tokens in a passage")
+    parser.add_argument('--model_name_or_path', type=str, default='./LSR_retriever', 
+                        help="path to directory containing model weights and config file")
+    parser.add_argument('--no_fp16', action='store_true', 
+                        help="inference in fp32")
+    parser.add_argument('--no_title', action='store_true', 
+                        help="title not added to the passage body")
+    parser.add_argument('--lowercase', action='store_true', 
+                        help="lowercase text before encoding")
     return parser
 
 
 def add_retriever_args(parser):
     # retrieval
-    parser.add_argument('--do_retrieval', type=int, default=0,
-                        help="Number of documents to retrieve per questions")
-    parser.add_argument('--use_faiss_gpu', action="store_true", 
-                        help='If enabled, use faiss GPU for retrieval inference')
-    parser.add_argument('--num_gpus', type=int, default=-1)
     parser.add_argument('--passages', type=str, required=True,
                         help='Path to passages (.tsv file)')
     parser.add_argument('--passages_embeddings', type=str, required=True,
-                        help='Glob path to encoded passages')
+                        help='Path to encoded passages')
     parser.add_argument('--n_docs', type=int, default=10,
                         help="Number of documents to retrieve per questions")
-    parser.add_argument('--chunk_size', type=int, default=64,
-                        help="Maximum number of words in a chunk")
+    parser.add_argument('--re_per_gpu_batch_size', type=int, default=64,
+                        help="Retriever batch size")
     parser.add_argument('--normalize_text',
                         action='store_true', help="normalize text")
-    parser.add_argument('--question_maxlength', type=int, default=512, help="Maximum number of tokens in a question")
-    parser.add_argument('--cache_dict', type=str, default="./query2docs.pk",
+    parser.add_argument('--question_maxlength', type=int, default=512,
+                         help="Maximum number of tokens in a question")
+    parser.add_argument('--cache_dict', type=str, default=None,
                         help='Path to cached query mappings (.pk file)') 
     parser.add_argument('--re_model_name_or_path', type=str, default="facebook/contriever",
-                        help="path to directory containing model weights and config file")
+                        help="Path to directory containing retriever model weights and config file")
 
     # index
     parser.add_argument('--projection_size', type=int, default=768)
@@ -58,4 +82,7 @@ def add_retriever_args(parser):
                         help="Batch size of the number of passages indexed")
     parser.add_argument("--save_or_load_index", action='store_true',
                         help='If enabled, save index and load index if it exists')
+    parser.add_argument('--use_faiss_gpu', action="store_true", 
+                        help='If enabled, use faiss GPU for retrieval inference')
+    parser.add_argument('--num_gpus', type=int, default=-1)
     return parser

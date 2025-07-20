@@ -1,18 +1,15 @@
+import re
+import os
+import sys
+import glob
+import time
 import copy
 import pickle
-import numpy as np
 import faiss
-import glob
-from logging import getLogger
-import time
-import os
-from tqdm import tqdm
+import numpy as np
 import torch
-from datasets import load_dataset
-import ipdb
-import re
-import sys
-from ipdb import set_trace as bp
+
+from logging import getLogger
 
 import index_utils.index
 import index_utils.contriever
@@ -20,9 +17,8 @@ import index_utils.dragon
 import index_utils.utils
 import index_utils.slurm
 import index_utils.data_contriever
-from index_utils.evaluation import calculate_matches
 import index_utils.normalize_text
-
+from index_utils.evaluation import calculate_matches
 
 logger = getLogger()
 
@@ -122,7 +118,7 @@ class Retriever():
             self.index.index = faiss.index_cpu_to_all_gpus(self.index.index, co=cloner_options, ngpu=num_gpus)
             print(f'Conversion time: {time.time() - start_time_converting:.1f} s.')
 
-        if os.path.exists(args.cache_dict):
+        if args.cache_dict != None and os.path.exists(args.cache_dict):
             self.query2docs = pickle.load(open(args.cache_dict, "rb"))
         else:
             self.query2docs = {}
@@ -172,7 +168,7 @@ class Retriever():
                     q = index_utils.normalize_text.normalize(q)
                 batch_question.append(q)
                 # print("batch_question: ", batch_question)
-                if len(batch_question) == self.args.per_gpu_batch_size or k == len(queries) - 1:
+                if len(batch_question) == self.args.re_per_gpu_batch_size or k == len(queries) - 1:
                     encoded_batch = self.tokenizer.batch_encode_plus(
                         batch_question,
                         return_tensors="pt",
@@ -199,7 +195,7 @@ class Retriever():
                 q = index_utils.normalize_text.normalize(q)
             batch_question.append(q)
 
-            if len(batch_question) == self.args.per_gpu_batch_size or k == len(queries) - 1:
+            if len(batch_question) == self.args.re_per_gpu_batch_size or k == len(queries) - 1:
                 encoded_batch = self.tokenizer.batch_encode_plus(
                     batch_question,
                     return_tensors="pt",
@@ -218,6 +214,8 @@ class Retriever():
         return embeddings
 
     def dump_query2docs(self):
+        if self.args.cache_dict == None:
+            return
         with open(self.args.cache_dict, "wb") as f:
             pickle.dump(self.query2docs, f)
 

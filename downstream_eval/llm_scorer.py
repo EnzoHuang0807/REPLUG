@@ -5,12 +5,12 @@ from openai import OpenAI
 from itertools import combinations
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY").strip()
-if not OPENAI_API_KEY or not OPENAI_API_KEY.strip():
-    raise ValueError("Missing OPENAI_API_KEY. Please set it as an environment variable.")
-client = OpenAI(api_key=OPENAI_API_KEY)
-
 
 def relevance_score(question, docs):
+
+    if not OPENAI_API_KEY or not OPENAI_API_KEY.strip():
+        raise ValueError("Missing OPENAI_API_KEY. Please set it as an environment variable.")
+    client = OpenAI(api_key=OPENAI_API_KEY)
     
     formatted_docs = "\n".join(
         [f"({i+1}) {a}" for i, a in enumerate(docs)]
@@ -40,10 +40,13 @@ def relevance_score(question, docs):
 
 def pairwise_score(question, docs):
 
-    assert(len(docs) == 5)
+    if not OPENAI_API_KEY or not OPENAI_API_KEY.strip():
+        raise ValueError("Missing OPENAI_API_KEY. Please set it as an environment variable.")
+    client = OpenAI(api_key=OPENAI_API_KEY)
 
-    win_counts = [0] * 5
-    for i, j in combinations(range(5), 2):
+    n_docs = len(docs)
+    win_counts = [0] * n_docs
+    for i, j in combinations(range(n_docs), 2):
         prompt = (
             f"Query: {question}\n\n"
             f"Document A (Index {i}):\n{docs[i]}\n\n"
@@ -78,8 +81,8 @@ def pairwise_score(question, docs):
         else:
             continue
 
-    sorted_indices = sorted(range(5), key=lambda idx: win_counts[idx], reverse=True)
-    ranks = [0] * 5
+    sorted_indices = sorted(range(n_docs), key=lambda idx: win_counts[idx], reverse=True)
+    ranks = [0] * n_docs
     for rank_position, idx in enumerate(sorted_indices, start=1):
         ranks[idx] = rank_position
 

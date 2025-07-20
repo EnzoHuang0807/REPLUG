@@ -16,9 +16,6 @@ from scipy.special import softmax
 from collections import defaultdict
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from openai import OpenAI
-from itertools import combinations
-
 from retriever import Retriever
 from argument import add_lm_args, add_retriever_args
 from llm_scorer import pairwise_score, relevance_score
@@ -28,13 +25,8 @@ import random
 random.seed(0)
 torch.manual_seed(0)
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY").strip()
-if not OPENAI_API_KEY or not OPENAI_API_KEY.strip():
-    raise ValueError("Missing OPENAI_API_KEY. Please set it as an environment variable.")
-client = OpenAI(api_key=OPENAI_API_KEY)
 
-
-def call_api(args, prompt, temp):
+def call_model(args, prompt, temp):
 
     # Tokenize
     input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
@@ -54,10 +46,7 @@ def call_api(args, prompt, temp):
     full_sequence = gen_output.sequences[0]
     gen_token_id = full_sequence[input_ids.shape[1]]
     decoded_output = tokenizer.decode(full_sequence[input_ids.shape[1]:], skip_special_tokens=True)
-    
-    stop_seq="\n"
-    if stop_seq in decoded_output:
-        decoded_output = decoded_output.split(stop_seq)[0]
+    decoded_output = decoded_output.strip()
 
     # Get log probabilities of the top-4 tokens
     with torch.no_grad():
@@ -74,9 +63,9 @@ def call_api(args, prompt, temp):
 
     # Calculate perplexity of the first generated token 
     first_logprob = log_probs[gen_token_id].item()
-    perplexity = np.exp(first_logprob)
+    probability = np.exp(first_logprob)
 
-    return decoded_output, (top_log_probs, perplexity)
+    return decoded_output, (top_log_probs, probability)
 
 
 def inference_one_ex(args, counter, prompt_batch, score_batch, eg):
@@ -85,7 +74,7 @@ def inference_one_ex(args, counter, prompt_batch, score_batch, eg):
     all_predictions = []
     
     for i, prompt in enumerate(prompt_batch):
-        output, probs = call_api(args, prompt, temp=0.01)
+        output, probs = call_model(args, prompt, temp=0.01)
         ans = output
         all_outputs.append(ans)
         all_weighted_probs.append(probs[1]*score_batch[i])
@@ -149,7 +138,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser = add_lm_args(parser)
     parser = add_retriever_args(parser)
-    parser.add_argument("--data_dir", "-d", type=str, default="data")
+    parser.add_argument("--dataset_dir", "-d", type=str, default="data",
+                         help="Path to the dataset directory.")
+    parser.add_argument("--truncate", type=int, default=10,
+                         help="Truncate data to the specified size for each subject ; use -1 to disable truncation.")
+    
     args = parser.parse_args()
     
     if args.save_predictions:
@@ -171,7 +164,7 @@ def main():
     model.to(device)
 
     # load dataset
-    subjects = sorted([f.split("_test.csv")[0] for f in os.listdir(os.path.join(args.data_dir, "test")) if "_test.csv" in f])
+    subjects = sorted([f.split("_test.csv")[0] for f in os.listdir(os.path.join(args.dataset_dir, "test")) if "_test.csv" in f])
     all_cors = {}
     all_counter = 0 
     all_em = 0
@@ -187,9 +180,9 @@ def main():
         data process
         '''
         print(f"subject: {subject}")
-        train_df = pd.read_csv(os.path.join(args.data_dir, "dev", subject + "_dev.csv"), header=None)[:args.shots]
-        val_df = pd.read_csv(os.path.join(args.data_dir, "val", subject + "_val.csv"), header=None)
-        test_df = pd.read_csv(os.path.join(args.data_dir, "test", subject + "_test.csv"), header=None)
+        train_df = pd.read_csv(os.path.join(args.dataset_dir, "dev", subject + "_dev.csv"), header=None)[:args.shots]
+        val_df = pd.read_csv(os.path.join(args.dataset_dir, "val", subject + "_val.csv"), header=None)
+        test_df = pd.read_csv(os.path.join(args.dataset_dir, "test", subject + "_test.csv"), header=None)
 
         # build demos
         demos = data_from_csv_to_list(train_df) 
@@ -200,8 +193,8 @@ def main():
         elif args.split == "val":
             test_set = data_from_csv_to_list(val_df)
         
-        if args.truncate and len(test_set) > 10:
-            test_set = test_set[:10]
+        if args.truncate != -1 and len(test_set) > args.truncate:
+            test_set = test_set[:args.truncate]
         print("test_set: ", len(test_set))
         
         # evaluate
@@ -211,15 +204,15 @@ def main():
         
         # build prompt
         prompt_demo = ""
-        if args.prompt_method in ["closed-book", "open-book"]:
-            for demo in demos:
-                # concat the top-1 doc
-                if args.prompt_method == "open-book":
-                    docs, scores = retrieve_ex(demo, retriever)
-                    prompt_demo += f"Knowledge: {docs[0]}\n"
-                prompt_demo += "Question: " + demo["question"] + "\n"
-                answer = demo["answer"]
-                prompt_demo += "Answer: " + answer.strip() + "\n\n"
+        for demo in demos:
+            # concat the top-1 doc
+            if args.do_retrieval:
+                assert(retriever != None)
+                docs, scores = retrieve_ex(demo, retriever)
+                prompt_demo += f"Knowledge: {docs[0]}\n"
+            prompt_demo += "Question: " + demo["question"] + "\n"
+            answer = demo["answer"]
+            prompt_demo += "Answer: " + answer.strip() + "\n\n"
 
         # run over test examples
         for eg in pbar:
@@ -236,7 +229,8 @@ def main():
             
             prompt_batch = []
             score_batch = []
-            if args.prompt_method == "open-book":
+            if args.do_retrieval:
+                assert(retriever != None)
                 docs, scores = retrieve_ex(eg, retriever, args.llm_scorer)
                 # contatenation
                 for doc, score in zip(docs, scores):
@@ -247,7 +241,7 @@ def main():
                     prompt_batch.append(prompt_cur)
                     score_batch.append(score)
 
-            elif args.prompt_method == "closed-book":
+            else:
                 prompt += "Question: " + eg["question"]  + "\n"
                 prompt += "Answer:"
                 prompt_batch.append(prompt)
@@ -305,8 +299,8 @@ def main():
         with open(out_json, 'w') as o_f:
             json.dump(overall_results, o_f, indent=4)
     
-    # if retriever is not None:
-    #     retriever.dump_query2docs()
+    if retriever is not None:
+        retriever.dump_query2docs()
 
 
 if __name__ == '__main__':
