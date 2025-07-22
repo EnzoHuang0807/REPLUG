@@ -27,7 +27,7 @@ random.seed(0)
 torch.manual_seed(0)
 
 
-def call_api(args, prompt, temp):
+def call_model(args, prompt, temp):
 
     # Tokenize
     input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
@@ -49,6 +49,10 @@ def call_api(args, prompt, temp):
     generated_ids = full_sequence[input_ids.shape[1]:]
     decoded_output = tokenizer.decode(generated_ids, skip_special_tokens=True)
     decoded_output = decoded_output.strip()
+
+    stop_str = "\n\n"
+    if stop_str in decoded_output:
+        decoded_output = decoded_output.split(stop_str)[0]
 
     # Extract log probability
     top_log_probs = []
@@ -75,7 +79,7 @@ def inference_one_ex(args, counter, prompt_batch, score_batch, eg):
     all_predictions = []
 
     for i, prompt in enumerate(prompt_batch):
-        output, probs = call_api(args, prompt, temp=0.01)
+        output, probs = call_model(args, prompt, temp=0.01)
         ans = output
         all_outputs.append(ans)
         all_probs.append(probs[1]*score_batch[i])
