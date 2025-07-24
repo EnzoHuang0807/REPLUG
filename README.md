@@ -121,7 +121,7 @@ python LSR_finetune/replug_lsr.py \
 --model_name_or_path LSR_retriever \
 --emb_dir LSR_embeddings \
 --epoch 3 \
---lr 2e-5 \
+--lr 0.00002 \
 --temperature_re 0.1 \
 --temperature_lm 0.1
 ```

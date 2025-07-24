@@ -6,7 +6,7 @@ def add_training_args(parser):
       
     parser.add_argument('--epoch', type=int, default=3, 
                         help="Number of training epochs")
-    parser.add_argument('--lr', type=int, default=2e-5, 
+    parser.add_argument('--lr', type=float, default=2e-5, 
                         help="Learning Rate")
     parser.add_argument('--lm_model_name_or_path', type=str, default="meta-llama/Llama-3.2-3B",
                         help="Path to directory containing LM model weights and config file")
