@@ -90,12 +90,12 @@ class Retriever():
 
         # index all passages
         input_paths = glob.glob(args.passages_embeddings)
-        input_paths = sorted(input_paths)
-        embeddings_dir = os.path.dirname(input_paths[0])
-        index_path = os.path.join(embeddings_dir, 'index.faiss')
+        input_paths = [ f for f in sorted(input_paths) if not f.endswith('.faiss')]
+        emb_dir = os.path.dirname(input_paths[0])
+        index_path = os.path.join(emb_dir, 'index.faiss')
         # bp()
         if args.save_or_load_index and os.path.exists(index_path):
-            self.index.deserialize_from(embeddings_dir)
+            self.index.deserialize_from(emb_dir)
         else:
             print(f'Indexing passages from files {input_paths}')
             start_time_indexing = time.time()
@@ -103,7 +103,7 @@ class Retriever():
                 self.index, input_paths, args.indexing_batch_size)
             print(f'Indexing time: {time.time() - start_time_indexing:.1f} s.')
             if args.save_or_load_index:
-                self.index.serialize(embeddings_dir)
+                self.index.serialize(emb_dir)
 
         if args.use_faiss_gpu and faiss.get_num_gpus() > 0:
             start_time_converting = time.time()

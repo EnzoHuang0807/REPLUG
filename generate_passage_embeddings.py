@@ -85,7 +85,15 @@ def generate_embeddings(args):
     allids, allembeddings = embed_passages(args, passages, model, tokenizer)
 
     save_file = os.path.join(args.emb_dir, args.prefix + f'_{args.shard_id:02d}')
-    os.makedirs(args.emb_dir, exist_ok=True)
+    
+    if os.path.exists(args.emb_dir):
+        for filename in os.listdir(args.emb_dir):
+            if filename.endswith('.faiss'):
+                file_path = os.path.join(args.emb_dir, filename)
+                os.remove(file_path)
+    else:
+        os.makedirs(args.emb_dir, exist_ok=True)
+
     print(f'Saving {len(allids)} passage embeddings to {save_file}.')
     with open(save_file, mode='wb') as f:
         pickle.dump((allids, allembeddings), f)
